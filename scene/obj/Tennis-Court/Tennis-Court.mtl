@@ -27,7 +27,7 @@ newmtl court
 	Kd 0.5882 0.5882 0.5882
 	Ks 0.0000 0.0000 0.0000
 	Ke 0.0000 0.0000 0.0000
-#	map_Ka ..\..\Woody\14\Props\ten.tif
-#	map_Kd ..\..\Woody\14\Props\ten.tif
+	map_Ka ..\..\Woody\14\Props\ten.tif
+	map_Kd ..\..\Woody\14\Props\ten.tif
 	map_bump ten_NRM.tga
 	bump ten_NRM.tga
