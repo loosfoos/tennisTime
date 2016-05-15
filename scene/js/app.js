@@ -8,9 +8,9 @@
 	var onRenderFcts= [];
 	var scene	= new THREE.Scene();
 	var camera	= new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 10000);
-	camera.position.z = 266;
-	camera.position.x = 266;
-	camera.position.y = 266;
+	camera.position.z = 500;
+	camera.position.x = 500;
+	camera.position.y = 500;
 
 
 	var worldx	= new THREEx.CannonWorld().start();
@@ -33,17 +33,6 @@
 		light.position.set(-0.5, -0.5, -2);
 		scene.add( light );
 	})()
-	
-	// add a light behind
-	var light	= new THREE.DirectionalLight('white', 1);
-	// var light	= new THREE.PointLight('white', 2)
-	scene.add( light );
-	light.position.y= 1;
-	onRenderFcts.push(function(delta, now){
-		var angle	= now*Math.PI*2 * 0.2;
-		light.position.x= Math.cos(angle)*3;
-		light.position.y= Math.sin(angle)*3;
-	})
 
 
 	var reboundMaterial	= new CANNON.Material('ball');
@@ -53,6 +42,9 @@
 		0.4,	// friction
 		0.65	// Restitution
 	));
+
+	var debugMaterial = new THREE.MeshBasicMaterial( {visible:false} );
+
 //////////////////////////////////////////////////////////////////////////////////
 //		Tennis ball								//
 //////////////////////////////////////////////////////////////////////////////////
@@ -63,13 +55,13 @@
 		mesh.name	= 'ball';
 		mesh.receiveShadow	= true;
 		mesh.castShadow	= true;
-		mesh.position.x	= +10;
-		mesh.position.y	=  200;	
+		mesh.position.x	= +60;
+		mesh.position.y	=  50;	
 		mesh.position.z	=  10;			
-		mesh.scale.set(4,4,4);
+		mesh.scale.set(10,10,10);
 		var body	= new THREEx.CannonBody({
 				mesh	: mesh,
-				mass	: 0.5,
+				mass	: 1,
 				material: reboundMaterial,
 			}).addTo(worldx);
 			onRenderFcts.push(function(delta, now){
@@ -85,9 +77,10 @@
   	object.name	= 'tennisRacket';
 	object.receiveShadow	= true;
 	object.castShadow	= true;
-	object.position.x	= +0.75;
-	object.position.y	=  0.5;
-	object.scale.set(0.01, 0.01, 0.01);
+	object.position.x	= 1000;
+	object.position.y	= 5;
+	object.position.z	= -200;
+	object.scale.set(0.02, 0.02, 0.02);
 
 	//Bounding box of the racket
 	var bbox = new THREE.Box3().setFromObject(object);
@@ -108,16 +101,16 @@
 		y: mesh.position.y,
 		z: mesh.position.z
 	};
-	//mesh.visible = false
+
 	scene.add( mesh );						
 	var body	= new THREEx.CannonBody({
 			mesh	: mesh,
-			mass	: 100,
+			mass	: 0,
 			material: reboundMaterial,
 		}).addTo(worldx);
 
 		body.body.angularVelocity.set(0,0,0);
-		body.body.motionstate = CANNON.Body.KINEMATIC
+		body.body.motionstate = CANNON.Body.STATIC
 		onRenderFcts.push(function(delta, now){
 			body.update(delta, now);
 		var bbox = new THREE.Box3().setFromObject(object);
@@ -135,38 +128,24 @@
 			object.quaternion.z	= body.body.quaternion.z;
 			object.quaternion.w	= body.body.quaternion.w;
 		});
-var last_position = {};
-      document.body.addEventListener('mousemove', function(event) {
-    //check to make sure there is data to compare against
-    if (typeof(last_position.x) != 'undefined') {
 
-        //get the change from last position to this position
-        var deltaX = last_position.x - event.clientX,
-            deltaY = last_position.y - event.clientY;
 
-		body.body.velocity.z += deltaY / 10;
-		body.body.velocity.x += deltaX / 10;
-    }
-
-    //set the new last position to the current for next time
-    last_position = {
-        x : event.clientX,
-        y : event.clientY
-    };
-
-      });
-
-      document.body.addEventListener('click', function() {
-      	body.body.mass+= 0.01;
-      });
-
+	//////////////////////////////////////////////////////////////////////////////////
+	//		handle the connection													//
+	//////////////////////////////////////////////////////////////////////////////////
+	var exampleSocket = new WebSocket("ws://127.0.0.1:1880/ws/socketRcp", "protocolOne");
+        exampleSocket.onmessage = function(event) {
+            var values = event.data.split(",");
+            /*body.body.quaternion.w = parseFloat(values[0]);
+            body.body.quaternion.x = parseFloat(values[1]);
+            body.body.quaternion.y = parseFloat(values[2]);
+            body.body.quaternion.z = parseFloat(values[3]);*/
+            var worldPoint	= new CANNON.Vec3(body.body.position.x, body.body.position.y, body.body.position.z);
+            var force = new CANNON.Vec3(values[4]*100,values[5]*100,values[6]*100);
+			body.body.applyForce(force,worldPoint);
+        }
 	} );
 })()
- /*var loader = new THREE.OBJMTLLoader();
- loader.load ('obj/Tennis-Court/Tennis-Court.obj', 'obj/Tennis-Court/Tennis-Court.mtl', 
-    function (object) {
-  		scene.add( object );
-    } );*/
 
 var onProgress = function (e){
 	//TODO: loading window in the beginning
@@ -176,67 +155,51 @@ var onError = function(e){
 	//TODO: Toast message for errors
 	console.log(e)
 };
-;(function(){
 
-	THREE.Loader.Handlers.add( /\.dds$/i, new THREE.DDSLoader() );
-	var mtlLoader = new THREE.MTLLoader();
-	mtlLoader.setBaseUrl( 'obj/Tennis-Court/' );
-	mtlLoader.setPath( 'obj/Tennis-Court/' );
-		var material	= new THREE.MeshLambertMaterial({
-		visible	: false
-	});
-	mtlLoader.load( 'Tennis-Court.mtl', function( materials ) {
+;(function(){				// model
+var loader = new THREE.JSONLoader();
 
-		materials.preload();
+// load a resource
+loader.load(
+	// resource URL
+	'obj/textures/terrain.js',
+	// Function when resource is loaded
+	function ( geometry, materials ) {
+		var material = new THREE.MultiMaterial( materials );
+		var object = new THREE.Mesh( geometry, material );
+		var bbox = new THREE.Box3().setFromObject(object);
+		console.log(bbox);
+		var floor = new THREE.PlaneGeometry( bbox.max.z - bbox.min.z, bbox.max.x - bbox.min.x);
+		var net = new THREE.PlaneGeometry( (bbox.max.z - bbox.min.z)*6.5/9, bbox.max.y - bbox.min.y);
+		
+		var floorMesh = new THREE.Mesh( floor, debugMaterial );
+		var netMesh = new THREE.Mesh( net, debugMaterial );
+		floorMesh.lookAt(floorMesh.position.clone().add(new THREE.Vector3(0,1,0)))
+		netMesh.lookAt(floorMesh.position.clone().add(new THREE.Vector3(1,0,0)))
+		netMesh.position.y = (bbox.max.y + bbox.min.y)/2;
+		//scene.add( floorMesh );
+		//scene.add( netMesh );
 
-		var objLoader = new THREE.OBJLoader();
-		//objLoader.setMaterials( materials );
-		objLoader.setPath( 'obj/Tennis-Court/' );
-		objLoader.load( 'Tennis-Court.obj', function ( object ) {
-			scene.add( object );
-			object.scale.set(5, 5, 5);
-
-			object.traverse(function(child){
-
-				var geometry = null;
-				var mesh = null;
-
-			var bbox = new THREE.Box3().setFromObject(child);
-		if(child.name == "Tennis_court")
-		{
-			//plane 1 : the ground
-			geometry	= new THREE.PlaneGeometry(bbox.max.z - bbox.min.z, bbox.max.x - bbox.min.x, 4, 4);
-			mesh	= new THREE.Mesh(geometry, material);
-			mesh.lookAt(mesh.position.clone().add(new THREE.Vector3(0,1,0)))
-			mesh.position.x	= (bbox.max.x + bbox.min.x)/2
-			mesh.position.z	= (bbox.max.z + bbox.min.z)/2
-		}
-		else if(child.name == "net")
-		{
-			//plane 2 : the net
-			geometry	= new THREE.PlaneGeometry(bbox.max.z - bbox.min.z, bbox.max.y - bbox.min.y, 4, 4);
-			mesh	= new THREE.Mesh(geometry, material);
-			mesh.position.y	= (bbox.max.y + bbox.min.y)/2
-			mesh.lookAt(mesh.position.clone().add(new THREE.Vector3(1,0,0)))
-		}
-	if(mesh != null)
-	{
-		//scene.add( mesh );
-		// init physics
 		var body	= new THREEx.CannonBody({
-			mesh	: mesh,
-			mass	: 0,
-			material: reboundMaterial
-		}).addTo(worldx)
-		onRenderFcts.push(function(delta, now){
-			body.update(delta, now)
-		});
-	}
+				mesh	: floorMesh,
+				mass	: 0,
+				material: reboundMaterial,
+			}).addTo(worldx);
+			onRenderFcts.push(function(delta, now){
+				body.update(delta, now);
 			});
-		}, onProgress, onError );
-		});
-
-	})();
+		var body2	= new THREEx.CannonBody({
+				mesh	: netMesh,
+				mass	: 0,
+				material: reboundMaterial,
+			}).addTo(worldx);
+			onRenderFcts.push(function(delta, now){
+				body2.update(delta, now);
+			});
+		scene.add( object );
+	}
+);
+})();
       // Create an event listener that resizes the renderer with the browser window.
       window.addEventListener('resize', function() {
         var WIDTH = window.innerWidth,
@@ -275,3 +238,4 @@ var onError = function(e){
 			onRenderFct(deltaMsec/1000, nowMsec/1000)
 		})
 	})
+

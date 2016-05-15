@@ -15,35 +15,83 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Hello World!"
-        android:id="@+id/textView2" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
         android:textAppearance="?android:attr/textAppearanceLarge"
-        android:text="Large Text"
-        android:id="@+id/textView"
-        android:layout_below="@+id/textView2"
+        android:text="Rotation"
+        android:fontFamily="serif-monospace"
+        android:id="@+id/rotTitle"
         android:layout_centerHorizontal="true"
-        android:layout_marginTop="93dp" />
+        android:layout_marginTop="1dp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textAppearance="?android:attr/textAppearanceLarge"
         android:text="Large Text"
-        android:id="@+id/textView3"
-        android:layout_below="@+id/textView"
+        android:id="@+id/x"
+        android:layout_below="@+id/rotTitle"
         android:layout_centerHorizontal="true"
-        android:layout_marginTop="48dp" />
+        android:layout_marginTop="1dp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textAppearance="?android:attr/textAppearanceLarge"
         android:text="Large Text"
-        android:id="@+id/textView4"
-        android:layout_centerVertical="true"
+        android:id="@+id/y"
+        android:layout_below="@+id/x"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="1dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text="Large Text"
+        android:id="@+id/z"
+        android:layout_below="@+id/y"
+        android:layout_marginTop="1dp"
         android:layout_centerHorizontal="true" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text="Acceleration"
+        android:fontFamily="serif-monospace"
+        android:id="@+id/accTitle"
+        android:layout_below="@+id/z"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="30dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text="Large Text"
+        android:id="@+id/acc_x"
+        android:layout_below="@+id/accTitle"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="1dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text="Large Text"
+        android:id="@+id/acc_y"
+        android:layout_below="@+id/acc_x"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="1dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text="Large Text"
+        android:id="@+id/acc_z"
+        android:layout_below="@+id/acc_y"
+        android:layout_marginTop="1dp"
+        android:layout_centerHorizontal="true" />
+
+
 </RelativeLayout>
