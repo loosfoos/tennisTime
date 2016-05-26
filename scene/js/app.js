@@ -136,10 +136,10 @@
 	var exampleSocket = new WebSocket("ws://127.0.0.1:1880/ws/socketRcp", "protocolOne");
         exampleSocket.onmessage = function(event) {
             var values = event.data.split(",");
-            /*body.body.quaternion.w = parseFloat(values[0]);
+            body.body.quaternion.w = parseFloat(values[0]);
             body.body.quaternion.x = parseFloat(values[1]);
             body.body.quaternion.y = parseFloat(values[2]);
-            body.body.quaternion.z = parseFloat(values[3]);*/
+            body.body.quaternion.z = parseFloat(values[3]);
             var worldPoint	= new CANNON.Vec3(body.body.position.x, body.body.position.y, body.body.position.z);
             var force = new CANNON.Vec3(values[4]*100,values[5]*100,values[6]*100);
 			body.body.applyForce(force,worldPoint);

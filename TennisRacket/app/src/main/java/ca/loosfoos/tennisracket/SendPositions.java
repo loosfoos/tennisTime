@@ -93,16 +93,15 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
             try {
                 for (;;) {
                     if (!suspended) {
-                        rotation[0] = quaternion[0];
-                        rotation[1] = quaternion[1];
-                        rotation[2] = quaternion[2];
-                        rotation[3] = quaternion[3];
-                        if (oldX != rotation[1] || oldY != rotation[2] || oldZ != rotation[3]) {
+                        rotation[0] = orientation[0];
+                        rotation[1] = orientation[1];
+                        rotation[2] = orientation[2];
+                        if (oldX != rotation[0] || oldY != rotation[1] || oldZ != rotation[2]) {
                             oldX = rotation[1];
                             oldY = rotation[2];
                             oldZ = rotation[3];
                             String str = String.valueOf(rotation[0]) + "," + String.valueOf(rotation[1]) + "," + String.valueOf(rotation[2]) + "," + String.valueOf(rotation[3])
-                            + "," + String.valueOf(mGravity[0])+ "," + String.valueOf(mGravity[1])+ "," + String.valueOf(mGravity[2]);
+                            + "," + String.valueOf(speed[0])+ "," + String.valueOf(speed[1])+ "," + String.valueOf(speed[2]);
                             byte[] send_data = str.getBytes();
 
                             DatagramPacket send_packet = new DatagramPacket(send_data, str.length(), ipAddress, 5000);
@@ -125,6 +124,14 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
         thread.start();
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
+        fab.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                lastTimeMili = 0;
+                speed[0] = 0;
+                speed[1] = 0;
+                speed[2] = 0;
+            }
+        });
         rot_X = (TextView) findViewById(R.id.x);
         rot_Y = (TextView) findViewById(R.id.y);
         rot_Z = (TextView) findViewById(R.id.z);
@@ -132,14 +139,14 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
         acc_X = (TextView) findViewById(R.id.acc_x);
         acc_Y = (TextView) findViewById(R.id.acc_y);
         acc_Z = (TextView) findViewById(R.id.acc_z);
+
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        //gyro = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+        gyro = mSensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
         accelerometer =  mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         magnetometer = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
-        //mSensorManager.requestTriggerSensor(mTriggerEventListener, gyro);
+        mSensorManager.requestTriggerSensor(mTriggerEventListener, gyro);
         mSensorManager.requestTriggerSensor(mTriggerEventListener, accelerometer);
         mSensorManager.requestTriggerSensor(mTriggerEventListener, magnetometer);
-
     }
 
     @Override
@@ -150,8 +157,8 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
         } catch(SocketException e1){
             e1.printStackTrace();
         }
-        //mSensorManager.registerListener(this, gyro, SensorManager.SENSOR_DELAY_GAME);
-        mSensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME);
+        mSensorManager.registerListener(this, gyro, SensorManager.SENSOR_DELAY_FASTEST);
+        mSensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_FASTEST);
         mSensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_GAME);
         super.onResume();
     }
@@ -159,7 +166,7 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
     @Override
     protected void onPause() {
         suspended = true;
-        //mSensorManager.unregisterListener(this, gyro);
+        mSensorManager.unregisterListener(this, gyro);
         mSensorManager.unregisterListener(this, accelerometer);
         mSensorManager.unregisterListener(this, magnetometer);
         client_socket.disconnect();
@@ -176,26 +183,43 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
     float[] mGeomagnetic;
     float orientation[] = new float[3];
     float quaternion[] = new float[4];
+    double[] speed = new double[3];
+    double[] position = new double[3];
+    long lastTimeMili = 0;
     public void onSensorChanged(SensorEvent event) {
         if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
             mGravity = event.values;
-            acc_X.setText("X:" + String.valueOf((int) (mGravity[0])));
-            acc_Y.setText("Y:" + String.valueOf((int) (mGravity[1])));
-            acc_Z.setText("Z:" + String.valueOf((int) (mGravity[2])));
         }
-        if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
+        else if(event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION)
+        {
+            float acc_x =(float) (mGravity[0]*(Math.cos(orientation[2])*Math.cos(orientation[0])+Math.sin(orientation[2])*Math.sin(orientation[1])*Math.sin(orientation[0])) + mGravity[1]*(Math.cos(orientation[1])*Math.sin(orientation[0])) + mGravity[2]*(-Math.sin(orientation[2])*Math.cos(orientation[0])+Math.cos(orientation[2])*Math.sin(orientation[1])*Math.sin(orientation[0])));
+            float acc_y = (float) (mGravity[0]*(-Math.cos(orientation[2])*Math.sin(orientation[0])+Math.sin(orientation[2])*Math.sin(orientation[1])*Math.cos(orientation[0])) + mGravity[1]*(Math.cos(orientation[1])*Math.cos(orientation[0])) + mGravity[2]*(Math.sin(orientation[2])*Math.sin(orientation[0])+ Math.cos(orientation[2])*Math.sin(orientation[1])*Math.cos(orientation[0])));
+            float acc_z = (float) (mGravity[0]*(Math.sin(orientation[2])*Math.cos(orientation[1])) + mGravity[1]*(-Math.sin(orientation[1])) + mGravity[2]*(Math.cos(orientation[2])*Math.cos(orientation[1])));
+
+            long curMili = System.currentTimeMillis();
+            if(lastTimeMili != 0) {
+                float deltaTime = ((float) (curMili - lastTimeMili)) / 1000;
+                speed[0] = acc_x;
+                speed[1] = acc_y;
+                speed[2] = acc_z;
+                acc_X.setText("X:" + String.valueOf((int) speed[0]));
+                acc_Y.setText("Y:" + String.valueOf((int) speed[1]));
+                acc_Z.setText("Z:" + String.valueOf((int) speed[2]));
+            }
+            lastTimeMili = curMili;
+        }
+        else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
             mGeomagnetic = event.values;
-        }
-        if (mGravity != null && mGeomagnetic != null) {
-            float R[] = new float[9];
-            float I[] = new float[9];
-            boolean success = SensorManager.getRotationMatrix(R, I, mGravity, mGeomagnetic);
-            if (success) {
-                SensorManager.getOrientation(R, orientation);
-                SensorManager.getQuaternionFromVector(quaternion, orientation);
-                rot_X.setText("X:" + String.valueOf((int) (orientation[0]* (180/Math.PI))));
-                rot_Y.setText("Y:" + String.valueOf((int) (orientation[1]* (180/Math.PI))));
-                rot_Z.setText("Z:" + String.valueOf((int) (orientation[2]* (180/Math.PI))));
+            if (mGravity != null && mGeomagnetic != null) {
+                float R[] = new float[9];
+                float I[] = new float[9];
+                boolean success = SensorManager.getRotationMatrix(R, I, mGravity, mGeomagnetic);
+                if (success) {
+                    SensorManager.getOrientation(R, orientation);
+                    rot_X.setText("X:" + String.valueOf((int) (orientation[1]* (180/Math.PI))));
+                    rot_Y.setText("Y:" + String.valueOf((int) (orientation[2]* (180/Math.PI))));
+                    rot_Z.setText("Z:" + String.valueOf((int) (orientation[0]* (180/Math.PI))));
+                }
             }
         }
     }
@@ -209,47 +233,6 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
     float rotX;
     float rotY;
     float rotZ;
-
-    /*private void handleGyroscope(SensorEvent event){
-        float x = event.values[0];
-        float y = event.values[1];
-        float z = event.values[2];
-        if (!mInitialized) {
-            mLastX = x;
-            mLastY = y;
-            mLastZ = z;
-            rot_X.setText("0.0");
-            rot_Y.setText("0.0");
-            rot_Z.setText("0.0");
-            mInitialized = true;
-        } else {
-            float deltaX = Math.abs(mLastX - x);
-            float deltaY = Math.abs(mLastY - y);
-            float deltaZ = Math.abs(mLastZ - z);
-            if (deltaX < NOISE) deltaX = (float) 0.0;
-            if (deltaY < NOISE) deltaY = (float) 0.0;
-            if (deltaZ < NOISE) deltaZ = (float) 0.0;
-            mLastX = x;
-            mLastY = y;
-            mLastZ = z;
-            rot_X.setText("X:" + String.valueOf((int)x));
-            rot_Y.setText("Y:" + String.valueOf((int)y));
-            rot_Z.setText("Z:" + String.valueOf((int)z));
-        }
-    }
-
-    public void handleAccelerometer(SensorEvent event) {
-
-    }
-
-    public void onSensorChanged(SensorEvent event) {
-        if(event.sensor == gyro){
-            handleGyroscope(event);
-        }
-        else if(event.sensor == accelerometer) {
-            handleAccelerometer(event);
-        }
-    }*/
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
