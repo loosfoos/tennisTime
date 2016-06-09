@@ -1,0 +1,55 @@
+# 3ds Max Wavefront OBJ Exporter v0.97b - (c)2007 guruware
+# File Created: 06.05.2016 22:50:33
+
+mtllib net.mtl
+
+#
+# object net
+#
+
+v  0.0000 7.3777 -28.6761
+v  0.0000 0.3703 -28.6761
+v  0.0000 0.3703 30.4532
+v  0.0000 7.3777 30.4532
+# 4 vertices
+
+vn -1.0000 0.0000 -0.0000
+# 1 vertex normals
+
+vt 0.0040 0.9728 0.0000
+vt 0.0041 0.6994 0.0000
+vt 0.9960 0.6993 0.0000
+vt 0.9959 0.9727 0.0000
+# 4 texture coords
+
+g net
+usemtl net
+s 1
+f 1/1/1 2/2/1 3/3/1 4/4/1 
+# 1 polygons
+
+#
+# object net01
+#
+
+v  0.0071 7.3777 30.4532
+v  0.0071 0.3703 30.4532
+v  0.0071 0.3703 -28.6761
+v  0.0071 7.3777 -28.6761
+# 4 vertices
+
+vn 1.0000 0.0000 -0.0000
+# 1 vertex normals
+
+vt 0.0040 0.9728 0.0000
+vt 0.0041 0.6994 0.0000
+vt 0.9960 0.6993 0.0000
+vt 0.9959 0.9727 0.0000
+# 4 texture coords
+
+g net01
+usemtl net
+s 1
+f 5/5/2 6/6/2 7/7/2 8/8/2 
+# 1 polygons
+

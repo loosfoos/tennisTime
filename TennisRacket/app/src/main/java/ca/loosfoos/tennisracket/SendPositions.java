@@ -7,12 +7,14 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.hardware.TriggerEvent;
 import android.hardware.TriggerEventListener;
+import android.opengl.Matrix;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -22,6 +24,8 @@ import android.widget.TextView;
 
 import java.io.BufferedWriter;
 import java.io.Console;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -41,7 +45,7 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
 
     private SensorManager mSensorManager;
     private TriggerEventListener mTriggerEventListener;
-    private Sensor gyro;
+    private Sensor linarAcceleration;
     private Sensor accelerometer;
     private Sensor magnetometer;
     private Socket socket;
@@ -62,9 +66,41 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
     private InetAddress ipAddress = null;
     DatagramSocket client_socket = null;
 
+
+    float[] lastRotationMatrix = new float[16];
+    float[] mGravity;
+    float[] mGeomagnetic;
+    private float gravity;
+    float accuracy;
+    float I[] = new float[9];
+    float orientation[] = new float[3];
+    float quaternion[] = new float[4];
+    double[] speed = new double[3];
+    //double[] position = new double[3];
+    long lastTimeMili = 0;
+
+    File accLog;
+    File speedLog;
+    File tLog;
+
+    BufferedWriter accBuffer;
+    BufferedWriter speedBuffer;
+    BufferedWriter tBuffer;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        //accLog = new File("sdcard/accLog.log" );
+        //accBuffer = initLogFile(accLog);
+
+        //speedLog = new File("sdcard/speedLog.log");
+        //speedBuffer = initLogFile(speedLog);
+
+
+        //tLog = new File("sdcard/tLog.log");
+        //tBuffer = initLogFile(tLog);
+
         setContentView(R.layout.activity_send_positions);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -97,11 +133,11 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
                         rotation[1] = orientation[1];
                         rotation[2] = orientation[2];
                         if (oldX != rotation[0] || oldY != rotation[1] || oldZ != rotation[2]) {
-                            oldX = rotation[1];
-                            oldY = rotation[2];
-                            oldZ = rotation[3];
-                            String str = String.valueOf(rotation[0]) + "," + String.valueOf(rotation[1]) + "," + String.valueOf(rotation[2]) + "," + String.valueOf(rotation[3])
-                            + "," + String.valueOf(speed[0])+ "," + String.valueOf(speed[1])+ "," + String.valueOf(speed[2]);
+                            oldX = rotation[0];
+                            oldY = rotation[1];
+                            oldZ = rotation[2];
+                            String str = String.valueOf(quaternion[0]) + "," + String.valueOf(quaternion[1]) + "," + String.valueOf(quaternion[2]) + "," + String.valueOf(quaternion[3])
+                            + "," + String.valueOf(acc[0])+ "," + String.valueOf(acc[1])+ "," + String.valueOf(acc[2]);
                             byte[] send_data = str.getBytes();
 
                             DatagramPacket send_packet = new DatagramPacket(send_data, str.length(), ipAddress, 5000);
@@ -112,7 +148,24 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
                             }
                         }
                     }
-                    SystemClock.sleep(100);
+                    SystemClock.sleep(100);runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            rot_X.setText("X:" + String.valueOf((int) (orientation[1] * (180 / Math.PI))));
+                            rot_Y.setText("Y:" + String.valueOf((int) (orientation[2] * (180 / Math.PI))));
+                            rot_Z.setText("Z:" + String.valueOf((int) (orientation[0] * (180 / Math.PI))));
+                            acc_X.setText("X:" + String.valueOf((int) (speed[0]*100)));
+                            acc_Y.setText("Y:" + String.valueOf((int) (speed[1]*100)));
+                            acc_Z.setText("Z:" + String.valueOf((int) (speed[2]*100)));
+
+                            try {
+                                wait(300);
+                            }
+                            catch(Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    });
                 }
             }
             catch(Exception exp) {
@@ -140,33 +193,50 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
         acc_Y = (TextView) findViewById(R.id.acc_y);
         acc_Z = (TextView) findViewById(R.id.acc_z);
 
+
+        //float [] orientOffset = new float[]{1,1,0};
+        //SensorManager.getQuaternionFromVector(quaternionOffsetAtStart, orientOffset);
+
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        gyro = mSensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
+        linarAcceleration = mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
         accelerometer =  mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         magnetometer = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
-        mSensorManager.requestTriggerSensor(mTriggerEventListener, gyro);
-        mSensorManager.requestTriggerSensor(mTriggerEventListener, accelerometer);
-        mSensorManager.requestTriggerSensor(mTriggerEventListener, magnetometer);
+        try {
+            mTriggerEventListener = new TriggerEventListener() {
+                @Override
+                public void onTrigger(TriggerEvent event) {
+                    // Do work
+                }
+            };
+
+            mSensorManager.requestTriggerSensor(mTriggerEventListener, linarAcceleration);
+            mSensorManager.requestTriggerSensor(mTriggerEventListener, accelerometer);
+            mSensorManager.requestTriggerSensor(mTriggerEventListener, magnetometer);
+        }
+        catch(Exception ex) {
+            Log.d("TAG", "onCreate: " + ex.getMessage());
+        }
+
     }
 
     @Override
     protected void onResume() {
-        suspended = false;
         try{
             client_socket = new DatagramSocket(5000);
         } catch(SocketException e1){
             e1.printStackTrace();
         }
-        mSensorManager.registerListener(this, gyro, SensorManager.SENSOR_DELAY_FASTEST);
+        mSensorManager.registerListener(this, linarAcceleration, SensorManager.SENSOR_DELAY_FASTEST);
         mSensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_FASTEST);
-        mSensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_GAME);
+        mSensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_FASTEST);
         super.onResume();
+        suspended = false;
     }
 
     @Override
     protected void onPause() {
         suspended = true;
-        mSensorManager.unregisterListener(this, gyro);
+        mSensorManager.unregisterListener(this, linarAcceleration);
         mSensorManager.unregisterListener(this, accelerometer);
         mSensorManager.unregisterListener(this, magnetometer);
         client_socket.disconnect();
@@ -176,51 +246,118 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int i){
-
+        accuracy = (float)Math.pow(10.0, 0-i);
     }
 
-    float[] mGravity;
-    float[] mGeomagnetic;
-    float orientation[] = new float[3];
-    float quaternion[] = new float[4];
-    double[] speed = new double[3];
-    double[] position = new double[3];
-    long lastTimeMili = 0;
+    float[] acc = new float[4];
+    float[] pastAcc = new float[4];
+    float[] RM = new float[16];
     public void onSensorChanged(SensorEvent event) {
-        if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-            mGravity = event.values;
-        }
-        else if(event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION)
+        if(event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR)
         {
-            float acc_x =(float) (mGravity[0]*(Math.cos(orientation[2])*Math.cos(orientation[0])+Math.sin(orientation[2])*Math.sin(orientation[1])*Math.sin(orientation[0])) + mGravity[1]*(Math.cos(orientation[1])*Math.sin(orientation[0])) + mGravity[2]*(-Math.sin(orientation[2])*Math.cos(orientation[0])+Math.cos(orientation[2])*Math.sin(orientation[1])*Math.sin(orientation[0])));
-            float acc_y = (float) (mGravity[0]*(-Math.cos(orientation[2])*Math.sin(orientation[0])+Math.sin(orientation[2])*Math.sin(orientation[1])*Math.cos(orientation[0])) + mGravity[1]*(Math.cos(orientation[1])*Math.cos(orientation[0])) + mGravity[2]*(Math.sin(orientation[2])*Math.sin(orientation[0])+ Math.cos(orientation[2])*Math.sin(orientation[1])*Math.cos(orientation[0])));
-            float acc_z = (float) (mGravity[0]*(Math.sin(orientation[2])*Math.cos(orientation[1])) + mGravity[1]*(-Math.sin(orientation[1])) + mGravity[2]*(Math.cos(orientation[2])*Math.cos(orientation[1])));
+            SensorManager.getQuaternionFromVector(quaternion, event.values);
+        }
+        else if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+            mGravity = event.values;
 
-            long curMili = System.currentTimeMillis();
-            if(lastTimeMili != 0) {
-                float deltaTime = ((float) (curMili - lastTimeMili)) / 1000;
-                speed[0] = acc_x;
-                speed[1] = acc_y;
-                speed[2] = acc_z;
-                acc_X.setText("X:" + String.valueOf((int) speed[0]));
-                acc_Y.setText("Y:" + String.valueOf((int) speed[1]));
-                acc_Z.setText("Z:" + String.valueOf((int) speed[2]));
+            if(timestamp != 0) {
+                final float deltaTime = (event.timestamp - timestamp) * NS2S;
+                Log.d("TAG", "deltaTime: " + deltaTime);
+
+                float[] accT = new float[4];
+                accT[0] = mGravity[0];
+                accT[1] = mGravity[1];
+                accT[2] = mGravity[2] ;
+                accT[3] = 0;
+                float[] accTer = new float[16];
+                Matrix.invertM(accTer, 0, RM, 0);
+
+                Matrix.multiplyMV(acc, 0, accTer, 0, accT,0);
+                acc[2] -= (float)gravity;
+                for(int i = 0; i<3; i++)
+                {
+                    /*if(Math.abs(acc[i]) < accuracy)
+                    {
+                        acc[i] = 0;
+                        speed[i] *= 0.7;
+                    }
+                    else
+                    {
+                        speed[i] = speed[i] + acc[i]*deltaTime;
+                    }*/
+                    speed[i] = speed[i] + acc[i]*deltaTime;
+                    //position[i] = position[i] + speed[i]*deltaTime;
+                }
+
+
+                //appendLog(accBuffer, String.valueOf(acc[0]));
+                //appendLog(speedBuffer, String.valueOf(speed[0]));
+                //appendLog(tBuffer, String.valueOf(deltaTime));
+
+
             }
-            lastTimeMili = curMili;
+            pastAcc[0] = acc[0];
+            pastAcc[1] = acc[1];
+            pastAcc[2] = acc[2];
+            timestamp = event.timestamp;
         }
         else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
             mGeomagnetic = event.values;
             if (mGravity != null && mGeomagnetic != null) {
-                float R[] = new float[9];
-                float I[] = new float[9];
-                boolean success = SensorManager.getRotationMatrix(R, I, mGravity, mGeomagnetic);
+                float R[] = new float[16];
+                boolean success = SensorManager.getRotationMatrix(RM, lastRotationMatrix, mGravity, mGeomagnetic);
                 if (success) {
-                    SensorManager.getOrientation(R, orientation);
-                    rot_X.setText("X:" + String.valueOf((int) (orientation[1]* (180/Math.PI))));
-                    rot_Y.setText("Y:" + String.valueOf((int) (orientation[2]* (180/Math.PI))));
-                    rot_Z.setText("Z:" + String.valueOf((int) (orientation[0]* (180/Math.PI))));
+                    SensorManager.getOrientation(RM, orientation);
+                    float[] accT = new float[4];
+                    accT[0] = mGravity[0];
+                    accT[1] = mGravity[1];
+                    accT[2] = mGravity[2] ;
+                    accT[3] = 0;
+                    float[] accTer = new float[16];
+                    float[] gravityPull = new float[4];
+                    Matrix.invertM(accTer, 0, RM, 0);
+                    Matrix.multiplyMV(gravityPull, 0, accTer, 0, accT,0);
+                    gravity = gravityPull[2];
+
                 }
             }
+        }
+    }
+
+    public BufferedWriter initLogFile(File logFile) {
+        BufferedWriter buf = null;
+        if (!logFile.exists())
+        {
+            try
+            {
+                logFile.createNewFile();
+            }
+            catch (IOException e)
+            {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
+        try {
+            //BufferedWriter for performance, true to set append to file flag
+            buf = new BufferedWriter(new FileWriter(logFile, true));
+        }
+        catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        return buf;
+    }
+
+    public void appendLog(BufferedWriter buffer, String text)
+    {
+        try {
+            //BufferedWriter for performance, true to set append to file flag
+            buffer.append(text);
+        }
+        catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
         }
     }
 

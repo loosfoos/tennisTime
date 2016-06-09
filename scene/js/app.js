@@ -1,20 +1,18 @@
-	var renderer	= new THREE.WebGLRenderer({
-		antialias	: true
+var renderer	= new THREE.WebGLRenderer({
+		antialiasing	: true
 	});
+	renderer.shadowMapEnabled	= true
 	renderer.setSize( window.innerWidth, window.innerHeight );
-	renderer.setClearColor( 'lightblue', 1 );
 	document.body.appendChild( renderer.domElement );
+
+	var debugMaterial = new THREE.MeshBasicMaterial( {visible:true} );
 
 	var onRenderFcts= [];
 	var scene	= new THREE.Scene();
 	var camera	= new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 10000);
-	camera.position.z = 500;
-	camera.position.x = 500;
-	camera.position.y = 500;
-
-
-	var worldx	= new THREEx.CannonWorld().start();
-	worldx.world.defaultContactMaterial.friction = 0.5;
+	camera.position.x = 2600;
+	camera.position.y = 450;
+	camera.position.z = -175;
 
 	//////////////////////////////////////////////////////////////////////////////////
 	//		set 3 point lighting						//
@@ -22,54 +20,121 @@
 
 	;(function(){
 		// add a ambient light
-		var light	= new THREE.AmbientLight( 0x020202 );
-		scene.add( light );
-		// add a light in front
-		var light	= new THREE.DirectionalLight('white', 1);
-		light.position.set(0.5, 0.5, 2);
-		scene.add( light );
-		// add a light behind
-		var light	= new THREE.DirectionalLight('white', 0.75);
-		light.position.set(-0.5, -0.5, -2);
-		scene.add( light );
+		var light	= new THREE.AmbientLight( 0x020202 )
+		scene.add( light )
+		// add a light front right
+		var light	= new THREE.DirectionalLight('white', 1)
+		light.position.set(0.5, 0.5, 2).multiplyScalar(10)
+		scene.add( light )
+		light.castShadow	= true
+		light.shadowCameraNear	= 0.01
+		light.shadowCameraFar	= 250
+		light.shadowCameraFov	= 45
+
+		light.shadowCameraLeft	= -20
+		light.shadowCameraRight	=  20
+		light.shadowCameraTop	=  30
+		light.shadowCameraBottom= -30
+		// light.shadowCameraVisible	= true
+
+		light.shadowBias	= 0.001
+		light.shadowDarkness	= 0.6
+
+		light.shadowMapWidth	= 2048
+		light.shadowMapHeight	= 2048
+
+		// // add a light behind
+		// var light	= new THREE.DirectionalLight('white', 0.75)
+		// light.position.set(-0.5, -0.5, -2)
 	})()
 
+	//////////////////////////////////////////////////////////////////////////////////
+	//		oimo world							//
+	//////////////////////////////////////////////////////////////////////////////////
 
-	var reboundMaterial	= new CANNON.Material('ball');
-	worldx.world.addContactMaterial(new CANNON.ContactMaterial(
-		reboundMaterial,
-		reboundMaterial,
-		0.4,	// friction
-		0.65	// Restitution
-	));
+	var world	= new OIMO.World(1/360, 2, 8)
+	setInterval(function(){
+		world.step()
+	}, 1000/180);
 
-	var debugMaterial = new THREE.MeshBasicMaterial( {visible:false} );
-
-//////////////////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////////////
 //		Tennis ball								//
 //////////////////////////////////////////////////////////////////////////////////
 
 	;(function(){
 		var mesh	= THREEx.SportBalls.createTennis();
-		scene.add(mesh);
-		mesh.name	= 'ball';
-		mesh.receiveShadow	= true;
-		mesh.castShadow	= true;
-		mesh.position.x	= +60;
-		mesh.position.y	=  50;	
-		mesh.position.z	=  10;			
-		mesh.scale.set(10,10,10);
-		var body	= new THREEx.CannonBody({
-				mesh	: mesh,
-				mass	: 1,
-				material: reboundMaterial,
-			}).addTo(worldx);
-			onRenderFcts.push(function(delta, now){
-				body.update(delta, now);
-			});
-	})()
+		mesh.receiveShadow	= true
+		mesh.castShadow		= true
+		mesh.scale.multiplyScalar(40)
+		mesh.position.x	= 1000;
+		mesh.position.y	= 200;
+		mesh.position.z	= -200;
+
+			scene.add( mesh )
+
+	// create IOMO.Body from mesh
+	var body	= THREEx.Oimo.createBodyFromMesh(world, mesh)
+
+	// add an updater for them
+	var updater	= new THREEx.Oimo.Body2MeshUpdater(body, mesh)
+	onRenderFcts.push(function(delta){
+		updater.update()
+	})
+	// 
+	/*body.body.linearVelocity.x	= 0
+	body.body.linearVelocity.y	= 1
+	body.body.linearVelocity.z	= -5
 	
-	;(function(){
+	body.body.angularVelocity.x	= -Math.PI*2*/
+	// body.body.angularVelocity.y	= 0
+	// body.body.angularVelocity.z	= 0
+})()
+
+;(function(){				// model
+var loader = new THREE.JSONLoader();
+
+// load a resource
+loader.load(
+	// resource URL
+	'obj/textures/terrain.js',
+	// Function when resource is loaded
+	function ( geometry, materials ) {
+		var material = new THREE.MultiMaterial( materials );
+		var object = new THREE.Mesh( geometry, material );
+		var bbox = new THREE.Box3().setFromObject(object);
+		console.log(bbox);
+
+		var floor = new THREE.BoxGeometry( bbox.max.x - bbox.min.x, 0.1, bbox.max.z - bbox.min.z);
+		var net = new THREE.BoxGeometry( (bbox.max.z - bbox.min.z)*6.5/9, bbox.max.y - bbox.min.y, 0.1);
+		
+		var floorMesh = new THREE.Mesh( floor, debugMaterial );
+		var netMesh = new THREE.Mesh( net, debugMaterial );
+
+		netMesh.position.y = (bbox.max.y + bbox.min.y)/2;
+		netMesh.rotation.y = Math.PI / 2;
+
+		floorMesh.receiveShadow	= true;
+		netMesh.receiveShadow = true;
+
+		var stepBody	= THREEx.Oimo.createBodyFromMesh(world, floorMesh, false)
+		scene.add(floorMesh)
+
+		var stepBody2	= THREEx.Oimo.createBodyFromMesh(world, netMesh, false)
+		scene.add(netMesh)
+
+		var updater	= new THREEx.Oimo.Body2MeshUpdater(stepBody, floorMesh)
+		var updater2	= new THREEx.Oimo.Body2MeshUpdater(stepBody2, netMesh)
+		onRenderFcts.push(function(delta){
+			updater.update()
+			updater2.update()
+		})
+		scene.add( object );
+	}
+);
+})();
+
+var racket = null;
+;(function(){
 	var objURL = 'obj/tennisRacket.obj';
 	var loader = new THREE.OBJLoader();
 	loader.load( objURL, function ( object ) {
@@ -85,15 +150,14 @@
 	//Bounding box of the racket
 	var bbox = new THREE.Box3().setFromObject(object);
 	//TODO: divide the racket into 2 bounding box.
-	var boundingObject =  new THREE.CubeGeometry(bbox.max.x - bbox.min.x, bbox.max.y - bbox.min.y, bbox.max.z - bbox.min.z, 3,3,3);
-	var material	= new THREE.MeshLambertMaterial({
-		visible: false
-	});
-	var mesh	= new THREE.Mesh(boundingObject, material);
+	var boundingObject =  new THREE.BoxGeometry((bbox.max.x - bbox.min.x), (bbox.max.y - bbox.min.y)/2, bbox.max.z - bbox.min.z);
+
+	var mesh	= new THREE.Mesh(boundingObject, debugMaterial);
+	racket = mesh;
 	mesh.name = "racket";
-	mesh.position.x	= (bbox.max.x + bbox.min.x)/2;
-	mesh.position.y	= (bbox.max.y + bbox.min.y)/2;
-	mesh.position.z	= (bbox.max.z + bbox.min.z)/2;
+	mesh.position.x	= object.position.x;
+	mesh.position.y	= object.position.y + (bbox.max.y - bbox.min.y)*3/4;
+	mesh.position.z	= object.position.z;
 	mesh.receiveShadow	= true;
 	mesh.castShadow		= true;
 	var prevPos = {
@@ -102,104 +166,93 @@
 		z: mesh.position.z
 	};
 
-	scene.add( mesh );						
-	var body	= new THREEx.CannonBody({
-			mesh	: mesh,
-			mass	: 0,
-			material: reboundMaterial,
-		}).addTo(worldx);
+	scene.add(mesh);			
+	var stepBody	= THREEx.Oimo.createBodyFromMesh(world, mesh, false)
+	//scene.add(mesh)	
+	var curVelocities = [];
+	var updater	= new THREEx.Oimo.Body2MeshUpdater(stepBody, mesh);
+	var rendering = false;
+	//stepBody.body.type = stepBody.body.BODY_DYNAMIC;
+	onRenderFcts.push(function(delta, now){
+		rendering = true;
+		if(curVelocities.length > 0) {
 
-		body.body.angularVelocity.set(0,0,0);
-		body.body.motionstate = CANNON.Body.STATIC
-		onRenderFcts.push(function(delta, now){
-			body.update(delta, now);
-		var bbox = new THREE.Box3().setFromObject(object);
-			// copy body.position to object.position
-			object.position.x += body.body.position.x - prevPos.x;
-			object.position.y += body.body.position.y - prevPos.y;
-			object.position.z += body.body.position.z - prevPos.z;
+			var totalVelocities = {
+				x:0,
+				y:0,
+				z:0
+			};
+			/*for(var i = 0; i < curVelocities.length; i++){
+				totalVelocities.x += curVelocities[i].x;
+				totalVelocities.y += curVelocities[i].y;
+				totalVelocities.z += curVelocities[i].z;
+			}
+			totalVelocities.x = totalVelocities.x/curVelocities.length;
+			totalVelocities.y = totalVelocities.y/curVelocities.length;
+			totalVelocities.z = totalVelocities.z/curVelocities.length;
 
-			prevPos.x = body.body.position.x;
-			prevPos.y = body.body.position.y;
-			prevPos.z = body.body.position.z;
-			// copy body.quaternion to object.quaternion
-			object.quaternion.x	= body.body.quaternion.x;
-			object.quaternion.y	= body.body.quaternion.y;
-			object.quaternion.z	= body.body.quaternion.z;
-			object.quaternion.w	= body.body.quaternion.w;
-		});
+			stepBody.body.linearVelocity.x = totalVelocities.x;
+			stepBody.body.linearVelocity.y = totalVelocities.y;
+			stepBody.body.linearVelocity.z = totalVelocities.z;
 
+			stepBody.body.position.x += totalVelocities.x*delta;
+			stepBody.body.position.y += totalVelocities.y*delta;
+			stepBody.body.position.z += totalVelocities.z*delta;
+			curVelocities = [];*/
+		}
+		updater.update();
+	//var bbox = new THREE.Box3().setFromObject(object);
+		// copy body.position to object.position (with)
+		//object.position.x = stepBody.body.position.x;
+		//object.position.y = stepBody.body.position.y;
+		//object.position.z = stepBody.body.position.z;
 
+		// copy body.quaternion to object.quaternion
+		object.quaternion.set(stepBody.body.orientation.x,stepBody.body.orientation.y,stepBody.body.orientation.z,stepBody.body.orientation.s);
+        object.updateMatrix();
+        //we compute the data again
+        rendering = false;
+	});
+	var initialQuaternion = new THREE.Quaternion(); 
+	initialQuaternion.setFromAxisAngle( new THREE.Vector3( 1, 0, 0 ), Math.PI / 2 );
+	stepBody.body.orientation = new OIMO.Quat(initialQuaternion.w, initialQuaternion.x, initialQuaternion.y, initialQuaternion.z);
 	//////////////////////////////////////////////////////////////////////////////////
 	//		handle the connection													//
 	//////////////////////////////////////////////////////////////////////////////////
+
+	var oldValues = null;
 	var exampleSocket = new WebSocket("ws://127.0.0.1:1880/ws/socketRcp", "protocolOne");
         exampleSocket.onmessage = function(event) {
             var values = event.data.split(",");
-            body.body.quaternion.w = parseFloat(values[0]);
-            body.body.quaternion.x = parseFloat(values[1]);
-            body.body.quaternion.y = parseFloat(values[2]);
-            body.body.quaternion.z = parseFloat(values[3]);
-            var worldPoint	= new CANNON.Vec3(body.body.position.x, body.body.position.y, body.body.position.z);
-            var force = new CANNON.Vec3(values[4]*100,values[5]*100,values[6]*100);
-			body.body.applyForce(force,worldPoint);
+            for(var i = 0; i<values.length;i++){
+            	values[i] = parseFloat(values[i]);
+            }
+            var newQuaternion = new THREE.Quaternion();    
+            var resultQuaternion = new THREE.Quaternion();   
+			newQuaternion.x = -values[1];
+			newQuaternion.y = values[2];//OK
+			newQuaternion.z = -values[3];
+			newQuaternion.w = values[0];
+			var r = resultQuaternion.multiplyQuaternions(initialQuaternion, newQuaternion);
+            stepBody.body.setQuaternion(r);
+            
+			/*var curVelocity = {}
+			curVelocity.x = parseFloat(values[4])*500; 
+			curVelocity.y = parseFloat(values[6])*500; 
+			curVelocity.z = parseFloat(values[6])*500;
+			if(!rendering){
+				curVelocities.push(curVelocity);
+			}*/
+			var deltaT = 1;/*
+			stepBody.body.position.x += values[4]*deltaT;
+			stepBody.body.position.y += values[6]*deltaT;
+			stepBody.body.position.z += values[5]*deltaT;*/
+            stepBody.body.updatePosition();
+            oldValues = values;
         }
 	} );
 })()
 
-var onProgress = function (e){
-	//TODO: loading window in the beginning
-	console.log(e)
-};
-var onError = function(e){
-	//TODO: Toast message for errors
-	console.log(e)
-};
-
-;(function(){				// model
-var loader = new THREE.JSONLoader();
-
-// load a resource
-loader.load(
-	// resource URL
-	'obj/textures/terrain.js',
-	// Function when resource is loaded
-	function ( geometry, materials ) {
-		var material = new THREE.MultiMaterial( materials );
-		var object = new THREE.Mesh( geometry, material );
-		var bbox = new THREE.Box3().setFromObject(object);
-		console.log(bbox);
-		var floor = new THREE.PlaneGeometry( bbox.max.z - bbox.min.z, bbox.max.x - bbox.min.x);
-		var net = new THREE.PlaneGeometry( (bbox.max.z - bbox.min.z)*6.5/9, bbox.max.y - bbox.min.y);
-		
-		var floorMesh = new THREE.Mesh( floor, debugMaterial );
-		var netMesh = new THREE.Mesh( net, debugMaterial );
-		floorMesh.lookAt(floorMesh.position.clone().add(new THREE.Vector3(0,1,0)))
-		netMesh.lookAt(floorMesh.position.clone().add(new THREE.Vector3(1,0,0)))
-		netMesh.position.y = (bbox.max.y + bbox.min.y)/2;
-		//scene.add( floorMesh );
-		//scene.add( netMesh );
-
-		var body	= new THREEx.CannonBody({
-				mesh	: floorMesh,
-				mass	: 0,
-				material: reboundMaterial,
-			}).addTo(worldx);
-			onRenderFcts.push(function(delta, now){
-				body.update(delta, now);
-			});
-		var body2	= new THREEx.CannonBody({
-				mesh	: netMesh,
-				mass	: 0,
-				material: reboundMaterial,
-			}).addTo(worldx);
-			onRenderFcts.push(function(delta, now){
-				body2.update(delta, now);
-			});
-		scene.add( object );
-	}
-);
-})();
       // Create an event listener that resizes the renderer with the browser window.
       window.addEventListener('resize', function() {
         var WIDTH = window.innerWidth,
@@ -213,15 +266,19 @@ loader.load(
       controls = new THREE.OrbitControls(camera, renderer.domElement);
 
 
+
 	//////////////////////////////////////////////////////////////////////////////////
 	//		render the scene						//
 	//////////////////////////////////////////////////////////////////////////////////
 	onRenderFcts.push(function(){
 		renderer.render( scene, camera );		
       	controls.update();
-      	camera.lookAt( scene.position )
+      	if(racket){
+      		camera.lookAt( racket.position )
+      	}
 	})
-	
+
+
 	//////////////////////////////////////////////////////////////////////////////////
 	//		loop runner							//
 	//////////////////////////////////////////////////////////////////////////////////
@@ -238,4 +295,3 @@ loader.load(
 			onRenderFct(deltaMsec/1000, nowMsec/1000)
 		})
 	})
-
