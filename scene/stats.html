@@ -1,0 +1,140 @@
+
+<!doctype>
+<link type="text/css" rel="stylesheet" href="css/rickshaw.min.css">
+<link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/themes/smoothness/jquery-ui.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.2/jquery.min.js"></script> 
+<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js"></script>
+<script src="js/vendor/d3.min.js"></script>
+<script src="js/vendor/d3.layout.min.js"></script>
+<script src="js/vendor/rickshaw.min.js"></script>
+
+<style>
+#chart {
+  position: relative;
+  left: 40px;
+  display: block;
+}
+#y_axis {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+}
+#x_axis {
+  position: relative;
+  left: 40px;
+  height: 40px;
+}
+</style>
+<button style="z-index:9999" onclick="pauseRecording(this)">PAUSE</button>
+<div id="chart_container">
+  <div id="y_axis"></div>
+  <div id="chart"></div>
+  <div id="x_axis"></div>
+  <div id="legend"></div>
+</div>
+
+<script>
+
+// instantiate our graph!
+
+var graph = new Rickshaw.Graph( {
+  element: document.getElementById("chart"),
+  renderer: 'scatterplot',
+  height: 800,
+  width: 800,
+  series: [
+    {
+      name: "accX",
+      data: [  ],
+      color: "#c05020"
+    }, {
+      name: "speedX",
+      data: [  ],
+      color: "#30c020"
+    }, {
+      name: "nullValue",
+      data: [  ],
+      color: "#6060c0"
+    }
+  ]
+} );
+/*
+var format = function(n) {
+
+  var map = {
+    0: 'zero',
+    1: 'first',
+    2: 'second',
+    3: 'third',
+    4: 'fourth'
+  };
+
+  return map[n];
+}*/
+
+var x_ticks = new Rickshaw.Graph.Axis.X( {
+  graph: graph
+} );
+
+var y_ticks = new Rickshaw.Graph.Axis.Y( {
+  graph: graph,
+  orientation: 'left',
+  tickFormat: Rickshaw.Fixtures.Number.formatKMBT,
+  unstack: 'true',
+  stack: 'false',
+  element: document.getElementById('y_axis')
+} );
+
+graph.render();
+var legend = new Rickshaw.Graph.Legend( {
+  graph: graph,
+  element: document.getElementById('legend')
+
+} );
+
+var shelving = new Rickshaw.Graph.Behavior.Series.Toggle( {
+  graph: graph,
+  legend: legend
+} );
+
+var order = new Rickshaw.Graph.Behavior.Series.Order( {
+  graph: graph,
+  legend: legend
+} );
+
+var highlight = new Rickshaw.Graph.Behavior.Series.Highlight( {
+  graph: graph,
+  legend: legend
+} );
+var paused = false;
+function pauseRecording(self){
+  if(paused){
+    self.innerHTML = "PAUSE";
+  }
+  else {
+    self.innerHTML = "START";
+  }
+  paused = !paused;
+}
+var nbData = 0;
+  var exampleSocket = new WebSocket("ws://127.0.0.1:1880/ws/socketRcp", "protocolOne");
+        exampleSocket.onmessage = function(event) {
+            var values = event.data.split(",");
+            if(!paused){
+              for(var i = 0; i<values.length;i++){
+                values[i] = parseFloat(values[i]);
+              }
+              if(nbData > 20){
+              graph.series[0].data.shift();
+              graph.series[1].data.shift();
+              graph.series[2].data.shift();
+              }
+              graph.series[0].data.push({x:nbData, y:values[5]+30});
+              graph.series[1].data.push({x:nbData, y:values[8]+30});
+              graph.series[2].data.push({x:nbData, y:30});
+              nbData++;
+              graph.render();
+          }
+        }
+</script>

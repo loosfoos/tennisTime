@@ -79,27 +79,11 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
     //double[] position = new double[3];
     long lastTimeMili = 0;
 
-    File accLog;
-    File speedLog;
-    File tLog;
-
-    BufferedWriter accBuffer;
-    BufferedWriter speedBuffer;
-    BufferedWriter tBuffer;
-
+    DataLogger accLogger;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        //accLog = new File("sdcard/accLog.log" );
-        //accBuffer = initLogFile(accLog);
-
-        //speedLog = new File("sdcard/speedLog.log");
-        //speedBuffer = initLogFile(speedLog);
-
-
-        //tLog = new File("sdcard/tLog.log");
-        //tBuffer = initLogFile(tLog);
+        accLogger = new DataLogger("acc_x.txt");
 
         setContentView(R.layout.activity_send_positions);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -137,7 +121,8 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
                             oldY = rotation[1];
                             oldZ = rotation[2];
                             String str = String.valueOf(quaternion[0]) + "," + String.valueOf(quaternion[1]) + "," + String.valueOf(quaternion[2]) + "," + String.valueOf(quaternion[3])
-                            + "," + String.valueOf(acc[0])+ "," + String.valueOf(acc[1])+ "," + String.valueOf(acc[2]);
+                            + "," + String.valueOf(acc[0])+ "," + String.valueOf(acc[1])+ "," + String.valueOf(acc[2])
+                                    + "," + String.valueOf(speed[0])+ "," + String.valueOf(speed[1])+ "," + String.valueOf(speed[2]);
                             byte[] send_data = str.getBytes();
 
                             DatagramPacket send_packet = new DatagramPacket(send_data, str.length(), ipAddress, 5000);
@@ -154,9 +139,9 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
                             rot_X.setText("X:" + String.valueOf((int) (orientation[1] * (180 / Math.PI))));
                             rot_Y.setText("Y:" + String.valueOf((int) (orientation[2] * (180 / Math.PI))));
                             rot_Z.setText("Z:" + String.valueOf((int) (orientation[0] * (180 / Math.PI))));
-                            acc_X.setText("X:" + String.valueOf((int) (speed[0]*100)));
-                            acc_Y.setText("Y:" + String.valueOf((int) (speed[1]*100)));
-                            acc_Z.setText("Z:" + String.valueOf((int) (speed[2]*100)));
+                            acc_X.setText("X:" + String.valueOf((int) (speed[0])));
+                            acc_Y.setText("Y:" + String.valueOf((int) (speed[1])));
+                            acc_Z.setText("Z:" + String.valueOf((int) (speed[2])));
 
                             try {
                                 wait(300);
@@ -252,6 +237,7 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
     float[] acc = new float[4];
     float[] pastAcc = new float[4];
     float[] RM = new float[16];
+    float startTimeStamp;
     public void onSensorChanged(SensorEvent event) {
         if(event.sensor.getType() == Sensor.TYPE_ROTATION_VECTOR)
         {
@@ -279,15 +265,12 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
                     /*if(Math.abs(acc[i]) < accuracy)
                     {
                         acc[i] = 0;
-                        speed[i] *= 0.7;
-                    }
-                    else
-                    {
-                        speed[i] = speed[i] + acc[i]*deltaTime;
                     }*/
                     speed[i] = speed[i] + acc[i]*deltaTime;
+
                     //position[i] = position[i] + speed[i]*deltaTime;
                 }
+                accLogger.logData(",{x:" +String.valueOf(acc[0]) + ",t:"+ String.valueOf(event.timestamp - startTimeStamp) +"}");
 
 
                 //appendLog(accBuffer, String.valueOf(acc[0]));
@@ -296,10 +279,14 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
 
 
             }
+            else {
+                accLogger.logData("{x:" +String.valueOf(acc[0]) + ",t:0.0}");
+            }
             pastAcc[0] = acc[0];
             pastAcc[1] = acc[1];
             pastAcc[2] = acc[2];
             timestamp = event.timestamp;
+            startTimeStamp = event.timestamp;
         }
         else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
             mGeomagnetic = event.values;

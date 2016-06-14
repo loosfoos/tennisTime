@@ -65,7 +65,7 @@ var renderer	= new THREE.WebGLRenderer({
 		var mesh	= THREEx.SportBalls.createTennis();
 		mesh.receiveShadow	= true
 		mesh.castShadow		= true
-		mesh.scale.multiplyScalar(40)
+		mesh.scale.multiplyScalar(10)
 		mesh.position.x	= 1000;
 		mesh.position.y	= 200;
 		mesh.position.z	= -200;
@@ -75,19 +75,12 @@ var renderer	= new THREE.WebGLRenderer({
 	// create IOMO.Body from mesh
 	var body	= THREEx.Oimo.createBodyFromMesh(world, mesh)
 
+	body.body.setupMass();
 	// add an updater for them
 	var updater	= new THREEx.Oimo.Body2MeshUpdater(body, mesh)
 	onRenderFcts.push(function(delta){
 		updater.update()
 	})
-	// 
-	/*body.body.linearVelocity.x	= 0
-	body.body.linearVelocity.y	= 1
-	body.body.linearVelocity.z	= -5
-	
-	body.body.angularVelocity.x	= -Math.PI*2*/
-	// body.body.angularVelocity.y	= 0
-	// body.body.angularVelocity.z	= 0
 })()
 
 ;(function(){				// model
@@ -143,7 +136,7 @@ var racket = null;
 	object.receiveShadow	= true;
 	object.castShadow	= true;
 	object.position.x	= 1000;
-	object.position.y	= 5;
+	object.position.y	= 30;
 	object.position.z	= -200;
 	object.scale.set(0.02, 0.02, 0.02);
 
@@ -153,63 +146,34 @@ var racket = null;
 	var boundingObject =  new THREE.BoxGeometry((bbox.max.x - bbox.min.x), (bbox.max.y - bbox.min.y)/2, bbox.max.z - bbox.min.z);
 
 	var mesh	= new THREE.Mesh(boundingObject, debugMaterial);
+	mesh.geometry.applyMatrix( new THREE.Matrix4().makeTranslation( 0, (bbox.max.y - bbox.min.y)*3/4, 0 ) );
 	racket = mesh;
 	mesh.name = "racket";
-	mesh.position.x	= object.position.x;
-	mesh.position.y	= object.position.y + (bbox.max.y - bbox.min.y)*3/4;
-	mesh.position.z	= object.position.z;
 	mesh.receiveShadow	= true;
 	mesh.castShadow		= true;
-	var prevPos = {
-		x: mesh.position.x,
-		y: mesh.position.y,
-		z: mesh.position.z
-	};
+	mesh.position.x	= object.position.x;
+	mesh.position.y	= object.position.y;
+	mesh.position.z	= object.position.z;
 
 	scene.add(mesh);			
-	var stepBody	= THREEx.Oimo.createBodyFromMesh(world, mesh, false)
-	//scene.add(mesh)	
+	var stepBody	= THREEx.Oimo.createBodyFromMesh(world, mesh, false);
+
 	var curVelocities = [];
 	var updater	= new THREEx.Oimo.Body2MeshUpdater(stepBody, mesh);
 	var rendering = false;
 	//stepBody.body.type = stepBody.body.BODY_DYNAMIC;
+	//stepBody.body.setupMass();
 	onRenderFcts.push(function(delta, now){
 		rendering = true;
-		if(curVelocities.length > 0) {
-
-			var totalVelocities = {
-				x:0,
-				y:0,
-				z:0
-			};
-			/*for(var i = 0; i < curVelocities.length; i++){
-				totalVelocities.x += curVelocities[i].x;
-				totalVelocities.y += curVelocities[i].y;
-				totalVelocities.z += curVelocities[i].z;
-			}
-			totalVelocities.x = totalVelocities.x/curVelocities.length;
-			totalVelocities.y = totalVelocities.y/curVelocities.length;
-			totalVelocities.z = totalVelocities.z/curVelocities.length;
-
-			stepBody.body.linearVelocity.x = totalVelocities.x;
-			stepBody.body.linearVelocity.y = totalVelocities.y;
-			stepBody.body.linearVelocity.z = totalVelocities.z;
-
-			stepBody.body.position.x += totalVelocities.x*delta;
-			stepBody.body.position.y += totalVelocities.y*delta;
-			stepBody.body.position.z += totalVelocities.z*delta;
-			curVelocities = [];*/
-		}
+		stepBody.body.updatePosition(delta);
 		updater.update();
-	//var bbox = new THREE.Box3().setFromObject(object);
-		// copy body.position to object.position (with)
-		//object.position.x = stepBody.body.position.x;
-		//object.position.y = stepBody.body.position.y;
-		//object.position.z = stepBody.body.position.z;
 
 		// copy body.quaternion to object.quaternion
 		object.quaternion.set(stepBody.body.orientation.x,stepBody.body.orientation.y,stepBody.body.orientation.z,stepBody.body.orientation.s);
-        object.updateMatrix();
+        object.position.x = mesh.position.x;
+		object.position.y = mesh.position.y;
+		object.position.z = mesh.position.z;
+		object.updateMatrix();
         //we compute the data again
         rendering = false;
 	});
@@ -235,19 +199,7 @@ var racket = null;
 			newQuaternion.w = values[0];
 			var r = resultQuaternion.multiplyQuaternions(initialQuaternion, newQuaternion);
             stepBody.body.setQuaternion(r);
-            
-			/*var curVelocity = {}
-			curVelocity.x = parseFloat(values[4])*500; 
-			curVelocity.y = parseFloat(values[6])*500; 
-			curVelocity.z = parseFloat(values[6])*500;
-			if(!rendering){
-				curVelocities.push(curVelocity);
-			}*/
-			var deltaT = 1;/*
-			stepBody.body.position.x += values[4]*deltaT;
-			stepBody.body.position.y += values[6]*deltaT;
-			stepBody.body.position.z += values[5]*deltaT;*/
-            stepBody.body.updatePosition();
+			var deltaT = 1;
             oldValues = values;
         }
 	} );
@@ -264,8 +216,6 @@ var racket = null;
 
       // Add OrbitControls so that we can pan around with the mouse.
       controls = new THREE.OrbitControls(camera, renderer.domElement);
-
-
 
 	//////////////////////////////////////////////////////////////////////////////////
 	//		render the scene						//
