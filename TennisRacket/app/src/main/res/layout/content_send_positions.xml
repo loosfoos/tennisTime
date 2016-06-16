@@ -56,7 +56,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textAppearance="?android:attr/textAppearanceLarge"
-        android:text="Acceleration"
+        android:text="Calculated speed"
         android:fontFamily="serif-monospace"
         android:id="@+id/accTitle"
         android:layout_below="@+id/z"
@@ -92,6 +92,25 @@
         android:layout_below="@+id/acc_y"
         android:layout_marginTop="1dp"
         android:layout_centerHorizontal="true" />
+
+    <EditText
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/ipText"
+        android:layout_below="@+id/acc_z"
+        android:layout_marginTop="47dp"
+        android:layout_alignEnd="@+id/accTitle"
+        android:layout_alignStart="@+id/accTitle" />
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Apply IP"
+        android:id="@+id/button"
+        android:layout_below="@+id/ipText"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="53dp"
+        android:nestedScrollingEnabled="true" />
 
 
 </RelativeLayout>

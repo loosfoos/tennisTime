@@ -26,7 +26,7 @@
   height: 40px;
 }
 </style>
-<button style="z-index:9999" onclick="pauseRecording(this)">PAUSE</button>
+<button style="z-index:9999;position:fixed;top:25px;left:30px;" onclick="pauseRecording(this)">PAUSE</button>
 <div id="chart_container">
   <div id="y_axis"></div>
   <div id="chart"></div>
@@ -40,19 +40,24 @@
 
 var graph = new Rickshaw.Graph( {
   element: document.getElementById("chart"),
-  renderer: 'scatterplot',
+  renderer: 'line',
   height: 800,
   width: 800,
   series: [
     {
-      name: "accX",
+      name: "accZ",
       data: [  ],
       color: "#c05020"
     }, {
-      name: "speedX",
+      name: "speedZ",
       data: [  ],
       color: "#30c020"
     }, {
+      name: "UnprocessedSpeedZ",
+      data: [  ],
+      color: "#303020"
+    }, 
+    {
       name: "nullValue",
       data: [  ],
       color: "#6060c0"
@@ -129,10 +134,12 @@ var nbData = 0;
               graph.series[0].data.shift();
               graph.series[1].data.shift();
               graph.series[2].data.shift();
+              graph.series[3].data.shift();
               }
               graph.series[0].data.push({x:nbData, y:values[5]+30});
               graph.series[1].data.push({x:nbData, y:values[8]+30});
-              graph.series[2].data.push({x:nbData, y:30});
+              graph.series[2].data.push({x:nbData, y:values[11]+30});
+              graph.series[3].data.push({x:nbData, y:30});
               nbData++;
               graph.render();
           }

@@ -4,8 +4,7 @@ package ca.loosfoos.tennisracket;
  * Created by User on 2016-06-11.
  */
 public class KalmanFilter {
-    class KalmanState
-    {
+    class KalmanState {
         //process noise covariance
         double q;
 
@@ -22,17 +21,16 @@ public class KalmanFilter {
         double k;
     }
 
-    KalmanState state;
+    KalmanState state = new KalmanState();
 
-    public KalmanFilter(double q, double r, double p, double intial_value){
+    public KalmanFilter(double q, double r, double p, double intial_value) {
         state.q = q;
         state.r = r;
         state.p = p;
         state.x = intial_value;
     }
 
-    public void update(double measurement)
-    {
+    public void update(double measurement) {
         //prediction update
         //omit x = x
         state.p = state.p + state.q;
@@ -41,5 +39,10 @@ public class KalmanFilter {
         state.k = state.p / (state.p + state.r);
         state.x = state.x + state.k * (measurement - state.x);
         state.p = (1 - state.k) * state.p;
+    }
+
+    public double getEstimate()
+    {
+        return state.x;
     }
 }

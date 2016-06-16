@@ -20,6 +20,9 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
+import android.webkit.JavascriptInterface;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
 
 import java.io.BufferedWriter;
@@ -57,6 +60,7 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
     TextView acc_X;
     TextView acc_Y;
     TextView acc_Z;
+    EditText ipText;
     // Create a constant to convert nanoseconds to seconds.
     private static final float NS2S = 1.0f / 1000000000.0f;
     private final static double EPSILON = 0.00001;
@@ -76,90 +80,126 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
     float orientation[] = new float[3];
     float quaternion[] = new float[4];
     double[] speed = new double[3];
+    double [] rawSpeed = new double[3];
     //double[] position = new double[3];
     long lastTimeMili = 0;
 
+    Thread dataSenderThread;
+    boolean exitThread;
+
     DataLogger accLogger;
+
+    //kalmanFilter
+    KalmanFilter []kalmanFilters = new KalmanFilter[3];
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         accLogger = new DataLogger("acc_x.txt");
-
         setContentView(R.layout.activity_send_positions);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
+        ipText = (EditText)findViewById(R.id.ipText);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        Thread thread = new Thread(new Runnable() {
-        @Override
-        public void run() {
+        ipText.setText("192.168.5.62");
 
-            try{
-                client_socket = new DatagramSocket(5000);
-            } catch(SocketException e1){
-                e1.printStackTrace();
-            }
+        Button b = (Button)findViewById(R.id.button);
 
-            try{
-                ipAddress = InetAddress.getByName("192.168.5.62");
-            }
-            catch(UnknownHostException e2){
-                e2.printStackTrace();
-            }
-
-            float oldX = 0, oldY = 0, oldZ = 0;
-            float[] rotation = {0,0,0,0};
-
-
-            try {
-                for (;;) {
-                    if (!suspended) {
-                        rotation[0] = orientation[0];
-                        rotation[1] = orientation[1];
-                        rotation[2] = orientation[2];
-                        if (oldX != rotation[0] || oldY != rotation[1] || oldZ != rotation[2]) {
-                            oldX = rotation[0];
-                            oldY = rotation[1];
-                            oldZ = rotation[2];
-                            String str = String.valueOf(quaternion[0]) + "," + String.valueOf(quaternion[1]) + "," + String.valueOf(quaternion[2]) + "," + String.valueOf(quaternion[3])
-                            + "," + String.valueOf(acc[0])+ "," + String.valueOf(acc[1])+ "," + String.valueOf(acc[2])
-                                    + "," + String.valueOf(speed[0])+ "," + String.valueOf(speed[1])+ "," + String.valueOf(speed[2]);
-                            byte[] send_data = str.getBytes();
-
-                            DatagramPacket send_packet = new DatagramPacket(send_data, str.length(), ipAddress, 5000);
-                            try {
-                                client_socket.send(send_packet);
-                            } catch (Exception e1) {
-                                e1.printStackTrace();
+        b.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        if(dataSenderThread != null && dataSenderThread.isAlive())
+                        {
+                            exitThread = true;
+                            try{
+                                dataSenderThread.join();
                             }
-                        }
-                    }
-                    SystemClock.sleep(100);runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            rot_X.setText("X:" + String.valueOf((int) (orientation[1] * (180 / Math.PI))));
-                            rot_Y.setText("Y:" + String.valueOf((int) (orientation[2] * (180 / Math.PI))));
-                            rot_Z.setText("Z:" + String.valueOf((int) (orientation[0] * (180 / Math.PI))));
-                            acc_X.setText("X:" + String.valueOf((int) (speed[0])));
-                            acc_Y.setText("Y:" + String.valueOf((int) (speed[1])));
-                            acc_Z.setText("Z:" + String.valueOf((int) (speed[2])));
-
-                            try {
-                                wait(300);
-                            }
-                            catch(Exception e) {
+                            catch(InterruptedException e)
+                            {
                                 e.printStackTrace();
                             }
+                            exitThread = false;
                         }
-                    });
-                }
-            }
-            catch(Exception exp) {
-                exp.printStackTrace();
-            }
-        }
-    });
 
-        thread.start();
+                        dataSenderThread = new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+
+                                try{
+                                    client_socket = new DatagramSocket(5000);
+                                } catch(SocketException e1){
+                                    e1.printStackTrace();
+                                }
+
+                                try{
+                                    ipAddress = InetAddress.getByName(ipText.getText().toString());
+                                }
+                                catch(UnknownHostException e2){
+                                    e2.printStackTrace();
+                                }
+
+                                float oldX = 0, oldY = 0, oldZ = 0;
+                                float[] rotation = {0,0,0,0};
+
+
+                                try {
+                                    for (;;) {
+                                        if(exitThread){
+                                            break;
+                                        }
+                                        if (!suspended) {
+                                            rotation[0] = orientation[0];
+                                            rotation[1] = orientation[1];
+                                            rotation[2] = orientation[2];
+                                            if (oldX != rotation[0] || oldY != rotation[1] || oldZ != rotation[2]) {
+                                                oldX = rotation[0];
+                                                oldY = rotation[1];
+                                                oldZ = rotation[2];
+                                                String str = String.valueOf(quaternion[0]) + "," + String.valueOf(quaternion[1]) + "," + String.valueOf(quaternion[2]) + "," + String.valueOf(quaternion[3])
+                                                        + "," + String.valueOf(acc[0])+ "," + String.valueOf(acc[1])+ "," + String.valueOf(acc[2])
+                                                        + "," + String.valueOf(speed[0])+ "," + String.valueOf(speed[1])+ "," + String.valueOf(speed[2])
+                                                        + "," + String.valueOf(rawSpeed[0])+ "," + String.valueOf(rawSpeed[1])+ "," + String.valueOf(rawSpeed[2]);
+                                                byte[] send_data = str.getBytes();
+
+                                                DatagramPacket send_packet = new DatagramPacket(send_data, str.length(), ipAddress, 5000);
+                                                try {
+                                                    client_socket.send(send_packet);
+                                                } catch (Exception e1) {
+                                                    e1.printStackTrace();
+                                                }
+                                            }
+                                        }
+                                        SystemClock.sleep(100);runOnUiThread(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                rot_X.setText("X:" + String.valueOf((int) (orientation[1] * (180 / Math.PI))));
+                                                rot_Y.setText("Y:" + String.valueOf((int) (orientation[2] * (180 / Math.PI))));
+                                                rot_Z.setText("Z:" + String.valueOf((int) (orientation[0] * (180 / Math.PI))));
+                                                acc_X.setText("X:" + String.valueOf((int) (speed[0])));
+                                                acc_Y.setText("Y:" + String.valueOf((int) (speed[1])));
+                                                acc_Z.setText("Z:" + String.valueOf((int) (speed[2])));
+
+                                                try {
+                                                    wait(300);
+                                                }
+                                                catch(Exception e) {
+                                                    e.printStackTrace();
+                                                }
+                                            }
+                                        });
+                                    }
+                                }
+                                catch(Exception exp) {
+                                    exp.printStackTrace();
+                                }
+                            }
+                        });
+
+                        dataSenderThread.start();
+                    }
+                }
+        );
+
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
@@ -168,6 +208,9 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
                 speed[0] = 0;
                 speed[1] = 0;
                 speed[2] = 0;
+                rawSpeed[0] = 0;
+                rawSpeed[1] = 0;
+                rawSpeed[2] = 0;
             }
         });
         rot_X = (TextView) findViewById(R.id.x);
@@ -232,6 +275,11 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
     @Override
     public void onAccuracyChanged(Sensor sensor, int i){
         accuracy = (float)Math.pow(10.0, 0-i);
+
+        for(int j = 0;j<3;j++)
+        {
+            kalmanFilters[j] = new KalmanFilter(1, 0.01, 0.0, 0.0);
+        }
     }
 
     float[] acc = new float[4];
@@ -262,12 +310,17 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
                 acc[2] -= (float)gravity;
                 for(int i = 0; i<3; i++)
                 {
-                    /*if(Math.abs(acc[i]) < accuracy)
+                    if(Math.abs(acc[i]) < accuracy)
                     {
                         acc[i] = 0;
-                    }*/
-                    speed[i] = speed[i] + acc[i]*deltaTime;
+                    }
 
+                    if(kalmanFilters[i] != null)
+                    {
+                        kalmanFilters[i].update(acc[i]);
+                        speed[i] = speed[i] + kalmanFilters[i].getEstimate()*deltaTime;
+                    }
+                    rawSpeed[i] = rawSpeed[i] + acc[i]*deltaTime;
                     //position[i] = position[i] + speed[i]*deltaTime;
                 }
                 accLogger.logData(",{x:" +String.valueOf(acc[0]) + ",t:"+ String.valueOf(event.timestamp - startTimeStamp) +"}");
