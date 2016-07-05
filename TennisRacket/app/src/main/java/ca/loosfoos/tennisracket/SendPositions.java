@@ -48,7 +48,7 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
 
     private SensorManager mSensorManager;
     private TriggerEventListener mTriggerEventListener;
-    private Sensor linarAcceleration;
+    private Sensor rotationVector;
     private Sensor accelerometer;
     private Sensor magnetometer;
     private Socket socket;
@@ -94,7 +94,7 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        accLogger = new DataLogger("acc_x.txt");
+        //accLogger = new DataLogger("acc_x.txt");
         setContentView(R.layout.activity_send_positions);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -175,9 +175,9 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
                                                 rot_X.setText("X:" + String.valueOf((int) (orientation[1] * (180 / Math.PI))));
                                                 rot_Y.setText("Y:" + String.valueOf((int) (orientation[2] * (180 / Math.PI))));
                                                 rot_Z.setText("Z:" + String.valueOf((int) (orientation[0] * (180 / Math.PI))));
-                                                acc_X.setText("X:" + String.valueOf((int) (speed[0])));
-                                                acc_Y.setText("Y:" + String.valueOf((int) (speed[1])));
-                                                acc_Z.setText("Z:" + String.valueOf((int) (speed[2])));
+                                                acc_X.setText("X:" + String.valueOf((int) (acc[0]*100)));
+                                                acc_Y.setText("Y:" + String.valueOf((int) (acc[1]*100)));
+                                                acc_Z.setText("Z:" + String.valueOf((int) (acc[2]*100)));
 
                                                 try {
                                                     wait(300);
@@ -226,7 +226,7 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
         //SensorManager.getQuaternionFromVector(quaternionOffsetAtStart, orientOffset);
 
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        linarAcceleration = mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+        rotationVector = mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
         accelerometer =  mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         magnetometer = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
         try {
@@ -237,7 +237,7 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
                 }
             };
 
-            mSensorManager.requestTriggerSensor(mTriggerEventListener, linarAcceleration);
+            mSensorManager.requestTriggerSensor(mTriggerEventListener, rotationVector);
             mSensorManager.requestTriggerSensor(mTriggerEventListener, accelerometer);
             mSensorManager.requestTriggerSensor(mTriggerEventListener, magnetometer);
         }
@@ -254,7 +254,7 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
         } catch(SocketException e1){
             e1.printStackTrace();
         }
-        mSensorManager.registerListener(this, linarAcceleration, SensorManager.SENSOR_DELAY_FASTEST);
+        mSensorManager.registerListener(this, rotationVector, SensorManager.SENSOR_DELAY_FASTEST);
         mSensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_FASTEST);
         mSensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_FASTEST);
         super.onResume();
@@ -264,7 +264,7 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
     @Override
     protected void onPause() {
         suspended = true;
-        mSensorManager.unregisterListener(this, linarAcceleration);
+        mSensorManager.unregisterListener(this, rotationVector);
         mSensorManager.unregisterListener(this, accelerometer);
         mSensorManager.unregisterListener(this, magnetometer);
         client_socket.disconnect();
@@ -278,7 +278,7 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
 
         for(int j = 0;j<3;j++)
         {
-            kalmanFilters[j] = new KalmanFilter(1, 0.01, 0.0, 0.0);
+            kalmanFilters[j] = new KalmanFilter(0.1, 0.01, 0.0, 0.0);
         }
     }
 
@@ -296,7 +296,7 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
 
             if(timestamp != 0) {
                 final float deltaTime = (event.timestamp - timestamp) * NS2S;
-                Log.d("TAG", "deltaTime: " + deltaTime);
+                //Log.d("TAG", "deltaTime: " + deltaTime);
 
                 float[] accT = new float[4];
                 accT[0] = mGravity[0];
@@ -304,26 +304,27 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
                 accT[2] = mGravity[2] ;
                 accT[3] = 0;
                 float[] accTer = new float[16];
+
                 Matrix.invertM(accTer, 0, RM, 0);
 
-                Matrix.multiplyMV(acc, 0, accTer, 0, accT,0);
+                Matrix.multiplyMV(acc, 0, RM, 0, accT,0);
+
+
+
+                //Matrix.multiplyMV(acc, 0, RM, 0, accT, 0);
                 acc[2] -= (float)gravity;
                 for(int i = 0; i<3; i++)
                 {
-                    if(Math.abs(acc[i]) < accuracy)
-                    {
-                        acc[i] = 0;
-                    }
 
                     if(kalmanFilters[i] != null)
                     {
-                        kalmanFilters[i].update(acc[i]);
                         speed[i] = speed[i] + kalmanFilters[i].getEstimate()*deltaTime;
+                        kalmanFilters[i].update(acc[i]);
                     }
-                    rawSpeed[i] = rawSpeed[i] + acc[i]*deltaTime;
+                    rawSpeed[i] = rawSpeed[i] + 1/2*acc[i]*deltaTime*deltaTime;
                     //position[i] = position[i] + speed[i]*deltaTime;
                 }
-                accLogger.logData(",{x:" +String.valueOf(acc[0]) + ",t:"+ String.valueOf(event.timestamp - startTimeStamp) +"}");
+                //accLogger.logData(",{x:" +String.valueOf(acc[0]) + ",t:"+ String.valueOf(event.timestamp - startTimeStamp) +"}");
 
 
                 //appendLog(accBuffer, String.valueOf(acc[0]));
@@ -333,7 +334,7 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
 
             }
             else {
-                accLogger.logData("{x:" +String.valueOf(acc[0]) + ",t:0.0}");
+                //accLogger.logData("{x:" +String.valueOf(acc[0]) + ",t:0.0}");
             }
             pastAcc[0] = acc[0];
             pastAcc[1] = acc[1];
@@ -348,17 +349,40 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
                 boolean success = SensorManager.getRotationMatrix(RM, lastRotationMatrix, mGravity, mGeomagnetic);
                 if (success) {
                     SensorManager.getOrientation(RM, orientation);
-                    float[] accT = new float[4];
+                    /*float[] accT = new float[4];
                     accT[0] = mGravity[0];
                     accT[1] = mGravity[1];
                     accT[2] = mGravity[2] ;
                     accT[3] = 0;
-                    float[] accTer = new float[16];
+
                     float[] gravityPull = new float[4];
+                    Matrix.multiplyMV(acc, 0, RM, 0, accT, 0);
+
                     Matrix.invertM(accTer, 0, RM, 0);
                     Matrix.multiplyMV(gravityPull, 0, accTer, 0, accT,0);
                     gravity = gravityPull[2];
+                    float[] accTer = new float[16];
+                    //Matrix.invertM(accTer, 0, RM, 0);
 
+                    Matrix.multiplyMV(acc, 0, RM, 0, accT,0);
+                    if(timestamp != 0) {
+                        final float deltaTime = (event.timestamp - timestamp) * NS2S;
+                        for (int i = 0; i < 3; i++) {
+                            if(Math.abs(acc[i]) < accuracy)
+                            {
+                                acc[i] = 0;
+                            }
+
+                            if (kalmanFilters[i] != null) {
+                                speed[i] = speed[i] + kalmanFilters[i].getEstimate() * deltaTime;
+                                kalmanFilters[i].update(acc[i]);
+                            }
+                            rawSpeed[i] = rawSpeed[i] + acc[i] * deltaTime;
+                            //position[i] = position[i] + speed[i]*deltaTime;
+                        }
+                    }
+                    timestamp = event.timestamp;
+                    startTimeStamp = event.timestamp;*/
                 }
             }
         }

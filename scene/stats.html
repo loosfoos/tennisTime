@@ -26,7 +26,7 @@
   height: 40px;
 }
 </style>
-<button style="z-index:9999;position:fixed;top:25px;left:30px;" onclick="pauseRecording(this)">PAUSE</button>
+<button id="pauseButton" style="z-index:9999;position:fixed;top:25px;left:30px;" onclick="pauseRecording(this)">PAUSE</button>
 <div id="chart_container">
   <div id="y_axis"></div>
   <div id="chart"></div>
@@ -122,6 +122,9 @@ function pauseRecording(self){
   }
   paused = !paused;
 }
+  document.addEventListener("keyup",function(e){
+    pauseRecording(document.getElementById("pauseButton"));
+  });
 var nbData = 0;
   var exampleSocket = new WebSocket("ws://127.0.0.1:1880/ws/socketRcp", "protocolOne");
         exampleSocket.onmessage = function(event) {
