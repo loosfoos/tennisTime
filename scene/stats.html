@@ -61,6 +61,11 @@ var graph = new Rickshaw.Graph( {
       name: "nullValue",
       data: [  ],
       color: "#6060c0"
+    }, 
+    {
+      name: "maxValue",
+      data: [  ],
+      color: "#6060c0"
     }
   ]
 } );
@@ -138,11 +143,13 @@ var nbData = 0;
               graph.series[1].data.shift();
               graph.series[2].data.shift();
               graph.series[3].data.shift();
+              graph.series[4].data.shift();
               }
               graph.series[0].data.push({x:nbData, y:values[5]+30});
-              graph.series[1].data.push({x:nbData, y:values[8]+30});
-              graph.series[2].data.push({x:nbData, y:values[11]+30});
+              graph.series[1].data.push({x:nbData, y:values[9]+30});
+              graph.series[2].data.push({x:nbData, y:values[12]+30});
               graph.series[3].data.push({x:nbData, y:30});
+              graph.series[4].data.push({x:nbData, y:150});
               nbData++;
               graph.render();
           }

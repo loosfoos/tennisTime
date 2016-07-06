@@ -63,7 +63,7 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
     EditText ipText;
     // Create a constant to convert nanoseconds to seconds.
     private static final float NS2S = 1.0f / 1000000000.0f;
-    private final static double EPSILON = 0.00001;
+    private final static double EPSILON = 0.001;
     private final float[] deltaRotationVector = new float[4];
     private float rotationCurrent = 0;
     private float timestamp;
@@ -278,7 +278,7 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
 
         for(int j = 0;j<3;j++)
         {
-            kalmanFilters[j] = new KalmanFilter(0.1, 0.01, 0.0, 0.0);
+            kalmanFilters[j] = new KalmanFilter(1.125, 0, 0.0, 0.0);
         }
     }
 
@@ -312,16 +312,20 @@ public class SendPositions extends AppCompatActivity implements SensorEventListe
 
 
                 //Matrix.multiplyMV(acc, 0, RM, 0, accT, 0);
-                acc[2] -= (float)gravity;
+                acc[2] -= (float)SensorManager.GRAVITY_EARTH;
                 for(int i = 0; i<3; i++)
                 {
 
                     if(kalmanFilters[i] != null)
                     {
+                            kalmanFilters[i].update(acc[i]);
                         speed[i] = speed[i] + kalmanFilters[i].getEstimate()*deltaTime;
-                        kalmanFilters[i].update(acc[i]);
+
                     }
-                    rawSpeed[i] = rawSpeed[i] + 1/2*acc[i]*deltaTime*deltaTime;
+
+                    if(acc[i] > EPSILON) {
+                        rawSpeed[i] = rawSpeed[i] + acc[i] * deltaTime;
+                    }
                     //position[i] = position[i] + speed[i]*deltaTime;
                 }
                 //accLogger.logData(",{x:" +String.valueOf(acc[0]) + ",t:"+ String.valueOf(event.timestamp - startTimeStamp) +"}");

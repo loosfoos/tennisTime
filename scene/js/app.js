@@ -46,8 +46,8 @@ var renderer	= new THREE.WebGLRenderer({
 		light.shadowMapHeight	= 2048
 
 		// // add a light behind
-		// var light	= new THREE.DirectionalLight('white', 0.75)
-		// light.position.set(-0.5, -0.5, -2)
+		 var light	= new THREE.DirectionalLight('white', 0.75)
+		 light.position.set(-0.5, -0.5, -2).multiplyScalar(10)
 	})()
 
 	//////////////////////////////////////////////////////////////////////////////////
@@ -57,7 +57,7 @@ var renderer	= new THREE.WebGLRenderer({
 	var world	= new OIMO.World(1/360, 2, 8)
 	setInterval(function(){
 		world.step()
-	}, 1000/180);
+	}, 100/360);
 
 //////////////////////////////////////////////////////////////////////////////////
 //		Tennis racket								//
@@ -80,7 +80,7 @@ var racket = null;
 	//Bounding box of the racket
 	var bbox = new THREE.Box3().setFromObject(object);
 	//TODO: divide the racket into 2 bounding box.
-	var boundingObject =  new THREE.BoxGeometry((bbox.max.x - bbox.min.x)*1.2, (bbox.max.y - bbox.min.y)*2, (bbox.max.z - bbox.min.z)*1.2);
+	var boundingObject =  new THREE.BoxGeometry((bbox.max.x - bbox.min.x), (bbox.max.y - bbox.min.y)*2, 0.1);
 
 	var mesh	= new THREE.Mesh(boundingObject, debugMaterial2);
 	//mesh.geometry.applyMatrix( new THREE.Matrix4().makeTranslation( 0, (bbox.max.y - bbox.min.y)*3/4, 0 ) );
@@ -120,10 +120,11 @@ var racket = null;
 		stepBody.body.angularVelocity.x = q.x;
 		stepBody.body.angularVelocity.y = q.y;
 		stepBody.body.angularVelocity.z = q.z;*/
+		//stepBody.body.resetPosition(1000, 150, -200);
 		stepBody.body.setQuaternion(lastQuaternion);
-		stepBody.body.linearVelocity.set(0, 0, 0);
 		stepBody.body.updatePosition(delta);
 		updater.update();
+		stepBody.body.linearVelocity.set(0, 0, 0);
 
 		// copy body.quaternion to object.quaternion
 		object.quaternion.set(stepBody.body.orientation.x,stepBody.body.orientation.y,stepBody.body.orientation.z,stepBody.body.orientation.s);
@@ -176,6 +177,8 @@ var racket = null;
 			
 			lastQuaternion = resultQuaternion.multiplyQuaternions(initialQuaternion, newQuaternion);
             
+			//stepBody.body.setQuaternion(lastQuaternion);
+			//stepBody.body.linearVelocity.set(0, 0, 0);
 
 			//displacementVector = new THREE.Vector3( 0/*values[10]*0.001+1000*/, -values[12]*0.001+20, 0/*values[11]*0.001-200*/);
 			//stepBody.body.setPosition(displacementVector);
@@ -193,7 +196,7 @@ var racket = null;
 		var mesh	= THREEx.SportBalls.createTennis();
 		mesh.receiveShadow	= true
 		mesh.castShadow		= true
-		mesh.scale.multiplyScalar(10)
+		mesh.scale.multiplyScalar(15)
 		mesh.position.x	= 1000;
 		mesh.position.y	= 300;
 		mesh.position.z	= -300;
